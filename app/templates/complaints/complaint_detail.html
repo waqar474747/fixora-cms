@@ -1,0 +1,388 @@
+{% extends 'base.html' %}
+{% load app_filters %}
+{% block title %}Complaint {{ complaint.complaint_id }} - Fixora CMS{% endblock %}
+{% block extra_css %}
+<style>
+.workflow-tracker { display:flex; justify-content:space-between; position:relative; margin:2rem 0; padding:0; }
+.workflow-tracker::before { content:''; position:absolute; top:18px; left:30px; right:30px; height:3px; background:var(--gray-200); border-radius:3px; z-index:0; }
+.workflow-step { display:flex; flex-direction:column; align-items:center; position:relative; z-index:1; flex:1; }
+.workflow-step .step-dot { width:38px; height:38px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:.85rem; font-weight:700; background:var(--gray-200); color:var(--gray-500); border:3px solid var(--gray-200); transition:all .3s ease; }
+.workflow-step.completed .step-dot { background:var(--success); color:white; border-color:var(--success); }
+.workflow-step.active .step-dot { background:var(--primary); color:white; border-color:var(--primary); box-shadow:0 0 0 5px rgba(124,58,237,.2); animation:pulse-dot 2s infinite; }
+.workflow-step.rejected .step-dot { background:var(--danger); color:white; border-color:var(--danger); }
+.workflow-step .step-label { font-size:.65rem; font-weight:600; margin-top:.4rem; text-align:center; color:var(--gray-500); text-transform:uppercase; letter-spacing:.5px; }
+.workflow-step.completed .step-label { color:var(--success); }
+.workflow-step.active .step-label { color:var(--primary); font-weight:700; }
+.workflow-step.rejected .step-label { color:var(--danger); }
+.timeline-entry { position:relative; padding:1rem 0 1rem 2rem; border-left:2px solid var(--gray-200); margin-left:.5rem; }
+.timeline-entry:last-child { border-left-color:transparent; }
+.timeline-entry::before { content:''; position:absolute; left:-6px; top:1.25rem; width:10px; height:10px; border-radius:50%; background:var(--primary); border:2px solid white; box-shadow:0 0 0 3px rgba(124,58,237,.15); }
+.timeline-entry.status-submitted::before { background:var(--secondary); box-shadow:0 0 0 3px rgba(108,117,125,.15); }
+.timeline-entry.status-pending::before { background:var(--warning); box-shadow:0 0 0 3px rgba(245,158,11,.15); }
+.timeline-entry.status-under_review::before { background:var(--info); box-shadow:0 0 0 3px rgba(23,162,184,.15); }
+.timeline-entry.status-in_progress::before { background:var(--primary); box-shadow:0 0 0 3px rgba(13,110,253,.15); }
+.timeline-entry.status-resolved::before { background:var(--success); box-shadow:0 0 0 3px rgba(40,167,69,.15); }
+.timeline-entry.status-rejected::before { background:var(--danger); box-shadow:0 0 0 3px rgba(220,53,69,.15); }
+.media-card { transition:all .25s ease; border:1px solid var(--gray-200); }
+.media-card:hover { transform:translateY(-3px); box-shadow:var(--shadow-md); }
+</style>
+{% endblock %}
+{% block content %}
+<div class="container-fluid px-4">
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                <i class="fas {% if message.tags == 'success' %}fa-check-circle{% elif message.tags == 'error' %}fa-exclamation-circle{% else %}fa-info-circle{% endif %} me-2"></i>
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-4">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb mb-0">
+                <li class="breadcrumb-item"><a href="{% url 'dashboard:dashboard' %}">Dashboard</a></li>
+                <li class="breadcrumb-item"><a href="{% url 'complaints:list' %}">My Complaints</a></li>
+                <li class="breadcrumb-item active">{{ complaint.complaint_id }}</li>
+            </ol>
+        </nav>
+        <div class="d-flex gap-2">
+            <a href="{% url 'complaints:list' %}" class="btn btn-outline-secondary btn-sm">
+                <i class="fas fa-arrow-left"></i> Back
+            </a>
+            <a href="{% url 'complaints:download_pdf' pk=complaint.pk %}" class="btn btn-outline-info btn-sm">
+                <i class="fas fa-file-pdf"></i> PDF
+            </a>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <!-- Main Content -->
+        <div class="col-lg-8">
+            <!-- Tracking Hero Card -->
+            <div class="card mb-4">
+                <div class="card-body p-4">
+                    <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
+                        <div>
+                            <span class="badge bg-primary mb-2 px-3 py-2 rounded-pill" style="font-size:.85rem;">
+                                <i class="fas fa-qrcode me-1"></i> {{ complaint.complaint_id }}
+                            </span>
+                            <h3 class="fw-bold mb-1">{{ complaint.title }}</h3>
+                            <p class="text-muted small mb-0">
+                                <i class="fas fa-user me-1"></i> {{ complaint.user.get_full_name|default:complaint.user.username }}
+                                &middot; <i class="fas fa-calendar-alt me-1"></i> {{ complaint.created_at|date:"M d, Y H:i" }}
+                            </p>
+                        </div>
+                        <div class="text-end">
+                            <span class="badge bg-{{ complaint.get_status_display_color }} px-3 py-2 fs-6">{{ complaint.get_status_display }}</span>
+                            {% if complaint.priority == 'EMERGENCY' %}
+                                <span class="badge bg-dark px-3 py-2 fs-6 d-block mt-1">
+                                    <i class="fas fa-exclamation-triangle"></i> {{ complaint.get_priority_display }}
+                                </span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Workflow Progress Tracker -->
+            {% if complaint.status != 'REJECTED' %}
+            <div class="card mb-4">
+                <div class="card-body">
+                    <h6 class="fw-bold mb-3"><i class="fas fa-tasks text-primary me-2"></i>Complaint Progress</h6>
+                    <div class="workflow-tracker">
+                        {% for step in workflow_steps %}
+                            {% with step_idx=forloop.counter0 %}
+                            <div class="workflow-step
+                                {% if step_idx < current_step %}completed{% endif %}
+                                {% if step_idx == current_step %}active{% endif %}">
+                                <div class="step-dot">
+                                    {% if step_idx < current_step %}
+                                        <i class="fas fa-check" style="font-size:12px;"></i>
+                                    {% elif step == 'REJECTED' and current_step == -1 %}
+                                        <i class="fas fa-times"></i>
+                                    {% else %}
+                                        {{ step_idx|add:1 }}
+                                    {% endif %}
+                                </div>
+                                <div class="step-label">{{ status_labels|get_item:step }}</div>
+                            </div>
+                            {% endwith %}
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            {% else %}
+            <div class="card mb-4 border-danger">
+                <div class="card-body text-center py-4">
+                    <i class="fas fa-times-circle text-danger fa-3x mb-2"></i>
+                    <h5 class="fw-bold text-danger">Complaint Rejected</h5>
+                    {% if complaint.admin_remarks %}
+                        <p class="mb-0 text-muted">{{ complaint.admin_remarks }}</p>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Info Card -->
+            <div class="card mb-4">
+                <div class="card-body p-4">
+                    <div class="row g-4">
+                        <div class="col-md-4">
+                            <div class="small text-muted fw-bold text-uppercase mb-1">Category</div>
+                            <div class="fw-bold"><i class="fas fa-tag me-2 text-muted"></i>{{ complaint.category.name|default:'N/A' }}</div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="small text-muted fw-bold text-uppercase mb-1">Department</div>
+                            <div class="fw-bold"><i class="fas fa-building me-2 text-muted"></i>{{ complaint.department.name|default:'Not assigned' }}</div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="small text-muted fw-bold text-uppercase mb-1">Priority</div>
+                            <div class="fw-bold">
+                                <span class="badge bg-{% if complaint.priority == 'EMERGENCY' %}dark{% elif complaint.priority == 'HIGH' %}danger{% elif complaint.priority == 'MEDIUM' %}warning{% else %}info{% endif %} fs-6">
+                                    {{ complaint.get_priority_display }}
+                                </span>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="small text-muted fw-bold text-uppercase mb-1">Tracking ID</div>
+                            <div class="fw-bold text-primary" style="letter-spacing:.5px;">{{ complaint.complaint_id }}</div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="small text-muted fw-bold text-uppercase mb-1">Submitted On</div>
+                            <div class="fw-bold">{{ complaint.created_at|date:"M d, Y H:i" }}</div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="small text-muted fw-bold text-uppercase mb-1">Last Updated</div>
+                            <div class="fw-bold">{{ complaint.updated_at|date:"M d, Y H:i" }}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Attachments -->
+            {% if complaint.photo or complaint.document or complaint.attachment %}
+            <div class="card mb-4">
+                <div class="card-body p-4">
+                    <h5 class="fw-bold mb-3"><i class="fas fa-paperclip text-primary me-2"></i>Attachments</h5>
+                    <div class="row g-3">
+                        {% if complaint.photo %}
+                        <div class="col-md-4 col-6">
+                            <div class="card media-card text-center p-3">
+                                <i class="fas fa-image fa-2x text-primary mb-2"></i>
+                                <div class="small fw-bold">Photo</div>
+                                <a href="{{ complaint.photo.url }}" target="_blank" class="btn btn-sm btn-outline-primary mt-2">
+                                    <i class="fas fa-eye"></i> View
+                                </a>
+                            </div>
+                        </div>
+                        {% endif %}
+                        {% if complaint.document %}
+                        <div class="col-md-4 col-6">
+                            <div class="card media-card text-center p-3">
+                                <i class="fas fa-file-pdf fa-2x text-danger mb-2"></i>
+                                <div class="small fw-bold">Document</div>
+                                <a href="{{ complaint.document.url }}" target="_blank" class="btn btn-sm btn-outline-danger mt-2">
+                                    <i class="fas fa-download"></i> View
+                                </a>
+                            </div>
+                        </div>
+                        {% endif %}
+                        {% if complaint.attachment %}
+                        <div class="col-md-4 col-6">
+                            <div class="card media-card text-center p-3">
+                                <i class="fas fa-paperclip fa-2x text-secondary mb-2"></i>
+                                <div class="small fw-bold">Attachment</div>
+                                <a href="{{ complaint.attachment.url }}" target="_blank" class="btn btn-sm btn-outline-secondary mt-2">
+                                    <i class="fas fa-eye"></i> View
+                                </a>
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- QR & Location -->
+            {% if complaint.qr_code_data or complaint.latitude %}
+            <div class="card mb-4">
+                <div class="card-body p-4">
+                    <div class="row g-3">
+                        {% if complaint.qr_code_data %}
+                        <div class="col-md-6">
+                            <h6 class="fw-bold mb-2"><i class="fas fa-qrcode me-2 text-primary"></i>QR Code Data</h6>
+                            <div class="p-3 rounded-3" style="background:var(--gray-50);word-break:break-all;">
+                                <code>{{ complaint.qr_code_data }}</code>
+                            </div>
+                        </div>
+                        {% endif %}
+                        {% if complaint.latitude and complaint.longitude %}
+                        <div class="col-md-6">
+                            <h6 class="fw-bold mb-2"><i class="fas fa-map-marker-alt me-2 text-danger"></i>Location</h6>
+                            <div class="p-3 rounded-3" style="background:var(--gray-50);">
+                                <div class="mb-2 small">
+                                    <strong>Lat:</strong> {{ complaint.latitude|stringformat:"f" }}<br>
+                                    <strong>Lng:</strong> {{ complaint.longitude|stringformat:"f" }}
+                                </div>
+                                <a href="https://www.google.com/maps?q={{ complaint.latitude }},{{ complaint.longitude }}" target="_blank" class="btn btn-sm btn-outline-danger">
+                                    <i class="fas fa-map-marked-alt"></i> Open in Maps
+                                </a>
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Description -->
+            <div class="card mb-4">
+                <div class="card-body p-4">
+                    <h5 class="fw-bold mb-3"><i class="fas fa-align-left text-primary me-2"></i>Description</h5>
+                    <div class="p-4 rounded-3" style="background:var(--gray-50);border-left:4px solid var(--primary);">
+                        <p class="mb-0" style="white-space:pre-wrap;">{{ complaint.description }}</p>
+                    </div>
+                </div>
+            </div>
+
+            {% if complaint.status == 'RESOLVED' and complaint.user == request.user %}
+            <!-- Feedback -->
+            <div class="card mb-4">
+                <div class="card-body p-4">
+                    <h5 class="fw-bold mb-3"><i class="fas fa-star text-warning me-2"></i>Resolution Feedback</h5>
+                    {% with feedback=complaint.feedback %}
+                        {% if feedback %}
+                            <div class="mb-2">
+                                {% for i in "12345" %}
+                                    <i class="fas fa-star fa-lg {% if forloop.counter <= feedback.rating %}text-warning{% else %}text-muted opacity-25{% endif %}"></i>
+                                {% endfor %}
+                                <span class="fw-bold text-success ms-2">{{ feedback.rating }}/5</span>
+                            </div>
+                            {% if feedback.comment %}
+                                <p class="mb-0 text-muted fst-italic">"{{ feedback.comment }}"</p>
+                            {% endif %}
+                        {% else %}
+                            <p class="mb-2 text-muted">How would you rate this resolution?</p>
+                            <a href="{% url 'complaints:submit_feedback' pk=complaint.pk %}" class="btn btn-warning btn-sm">
+                                <i class="fas fa-star"></i> Submit Feedback
+                            </a>
+                        {% endif %}
+                    {% endwith %}
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Edit/Delete Actions -->
+            {% if complaint.user == request.user and complaint.status in 'SUBMITTED,PENDING' %}
+            <div class="d-flex gap-2 mb-4">
+                <a href="{% url 'complaints:edit' pk=complaint.pk %}" class="btn btn-warning">
+                    <i class="fas fa-edit"></i> Edit Complaint
+                </a>
+                <form method="post" action="{% url 'complaints:delete' pk=complaint.pk %}" onsubmit="return confirm('Are you sure? This cannot be undone.');">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-danger">
+                        <i class="fas fa-trash"></i> Delete
+                    </button>
+                </form>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Sidebar -->
+        <div class="col-lg-4">
+            {% with profile=user|get_profile %}{% if profile.is_admin or profile.is_staff_member %}
+            <div class="card mb-4">
+                <div class="card-header"><i class="fas fa-tools me-2 text-primary"></i>Staff Actions</div>
+                <div class="card-body">
+                    <a href="{% url 'complaints:update_status' pk=complaint.pk %}" class="btn btn-primary w-100 mb-2">
+                        <i class="fas fa-edit"></i> Update Status
+                    </a>
+                </div>
+            </div>
+            {% endif %}{% endwith %}
+
+            <!-- Complaint Timeline -->
+            <div class="card mb-4">
+                <div class="card-header"><i class="fas fa-history me-2 text-info"></i>Timeline</div>
+                <div class="card-body p-3">
+                    {% if history %}
+                        {% for h in history %}
+                            <div class="timeline-entry status-{{ h.new_value|lower|default:'submitted' }}">
+                                <div class="fw-bold small">{{ h.action }}</div>
+                                <div class="small text-muted">{{ h.timestamp|date:"M d, Y H:i" }}</div>
+                                <div class="small text-muted">
+                                    {% if h.changed_by %}
+                                        By: {{ h.changed_by.get_full_name|default:h.changed_by.username }}
+                                    {% else %}
+                                        By: System
+                                    {% endif %}
+                                </div>
+                            </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="text-center py-4">
+                            <i class="fas fa-stream fa-3x text-light mb-2"></i>
+                            <p class="text-muted small mb-0">No activity yet.</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Complaint Info -->
+            <div class="card mb-4">
+                <div class="card-header"><i class="fas fa-info-circle me-2 text-success"></i>Quick Info</div>
+                <div class="card-body p-3">
+                    <div class="mini-stat-row">
+                        <span class="mini-label"><i class="fas fa-fingerprint"></i> Tracking ID</span>
+                        <span class="mini-value text-primary" style="font-size:.8rem;">{{ complaint.complaint_id }}</span>
+                    </div>
+                    <div class="mini-stat-row">
+                        <span class="mini-label"><i class="fas fa-tag"></i> Category</span>
+                        <span class="mini-value">{{ complaint.category.name|default:'N/A' }}</span>
+                    </div>
+                    <div class="mini-stat-row">
+                        <span class="mini-label"><i class="fas fa-building"></i> Department</span>
+                        <span class="mini-value">{{ complaint.department.name|default:'N/A' }}</span>
+                    </div>
+                    {% if complaint.assigned_to %}
+                    <div class="mini-stat-row">
+                        <span class="mini-label"><i class="fas fa-user-tie"></i> Assigned To</span>
+                        <span class="mini-value">{{ complaint.assigned_to.get_full_name|default:complaint.assigned_to.username }}</span>
+                    </div>
+                    {% endif %}
+                    <div class="mini-stat-row">
+                        <span class="mini-label"><i class="fas fa-user-secret"></i> Anonymous</span>
+                        <span class="mini-value">{% if complaint.is_anonymous %}Yes{% else %}No{% endif %}</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Need Help -->
+            <div class="card" style="background:var(--gray-50);">
+                <div class="card-body text-center">
+                    <i class="fas fa-life-ring fa-2x text-primary mb-2"></i>
+                    <h6 class="fw-bold">Need Assistance?</h6>
+                    <p class="small text-muted mb-3">Contact our support team.</p>
+                    <a href="mailto:support@fixora.local" class="btn btn-outline-primary btn-sm w-100">
+                        <i class="fas fa-envelope"></i> Contact Support
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Animate workflow steps
+    const dots = document.querySelectorAll('.workflow-step.active .step-dot');
+    if (dots.length) {
+        dots[0].style.animation = 'pulse-dot 2s ease-in-out infinite';
+    }
+});
+</script>
+{% endblock %}

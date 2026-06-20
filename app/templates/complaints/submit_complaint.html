@@ -1,0 +1,465 @@
+{% extends 'base.html' %}
+{% block title %}Submit Complaint - Fixora CMS{% endblock %}
+{% block extra_css %}
+<style>
+.upload-box {
+    border: 2px dashed var(--gray-300);
+    border-radius: var(--radius);
+    padding: 1.5rem;
+    text-align: center;
+    cursor: pointer;
+    transition: all .25s ease;
+    background: var(--gray-50);
+    position: relative;
+}
+.upload-box:hover { border-color: var(--primary); background: #eef2ff; }
+.upload-box.has-file { border-color: var(--success); background: #d1fae5; }
+.upload-box input { display: none; }
+.upload-box .preview { max-width: 100%; max-height: 120px; border-radius: var(--radius-sm); margin-top: .5rem; }
+.upload-box .file-name { font-size: .8rem; color: var(--gray-600); margin-top: .25rem; }
+.scanner-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,.8); z-index: 9999; display: none; align-items: center; justify-content: center; }
+.scanner-modal.active { display: flex; }
+.scanner-modal .scanner-box { background: white; border-radius: var(--radius); padding: 1.5rem; max-width: 500px; width: 90%; text-align: center; }
+#qr-reader { width: 100%; }
+#qr-reader video { border-radius: var(--radius-sm); max-width: 100%; }
+#qr-reader__dashboard_section { padding: 0 !important; }
+#qr-reader__dashboard_section_csr { display: flex !important; justify-content: center; gap: 8px; margin: 10px 0 !important; }
+#qr-reader__dashboard_section_csr span { display: none !important; }
+#qr-reader__dashboard_section_csr button { border: none; background: var(--primary); color: white; padding: .5rem 1rem; border-radius: var(--radius-sm); font-weight: 600; cursor: pointer; }
+#qr-reader__status_span { background: var(--gray-100) !important; }
+.location-preview { display: flex; align-items: center; gap: .75rem; padding: .75rem; background: #eef2ff; border-radius: var(--radius-sm); margin-top: .5rem; }
+.location-preview .coord { font-size: .8rem; color: var(--gray-600); }
+.tracking-preview { background: linear-gradient(135deg, var(--primary), var(--secondary)); color: white; border-radius: var(--radius); padding: 1.5rem; text-align: center; margin-bottom: 1.5rem; }
+.tracking-preview .tracking-id { font-size: 1.25rem; font-weight: 800; letter-spacing: 1px; }
+.form-section-title { font-weight: 700; color: var(--gray-800); font-size: 1rem; margin-bottom: 1rem; padding-bottom: .5rem; border-bottom: 2px solid var(--gray-200); }
+.form-section-title i { color: var(--primary); margin-right: 8px; }
+</style>
+{% endblock %}
+{% block content %}
+<div class="container">
+    <div class="page-header">
+        <h1><i class="fas fa-file-alt"></i> Submit a New Complaint</h1>
+        <p class="lead">Fill in the details below and we'll help resolve your issue</p>
+    </div>
+
+    <div id="alert-container"></div>
+
+    <div class="row justify-content-center">
+        <div class="col-lg-10">
+            <div class="card shadow-lg border-0">
+                <div class="card-body p-4 p-md-5">
+
+                    <form id="complaintForm" method="post" enctype="multipart/form-data" novalidate>
+                        {% csrf_token %}
+
+                        <!-- Tracking Preview -->
+                        <div class="tracking-preview">
+                            <i class="fas fa-qrcode fa-2x mb-2 d-block opacity-75"></i>
+                            <div class="tracking-id" id="trackingPreview">FXR-2026-XXXXXX</div>
+                            <div class="small opacity-75 mt-1">Your FXR tracking ID will be auto-generated</div>
+                        </div>
+
+                        <!-- Section: Basic Details -->
+                        <div class="form-section-title"><i class="fas fa-info-circle"></i>Basic Details</div>
+                        <div class="row g-3 mb-4">
+                            <div class="col-12">
+                                <label class="form-label">Complaint Title <span class="text-danger">*</span></label>
+                                <input type="text" name="title" class="form-control" id="compTitle" placeholder="e.g., Water leakage in main corridor" required maxlength="200">
+                                <div class="invalid-feedback">Please enter a complaint title.</div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Category <span class="text-danger">*</span></label>
+                                <select name="category" class="form-select" id="categorySelect" required>
+                                    <option value="">Select Category</option>
+                                    {% for cat in categories %}
+                                        <option value="{{ cat.id }}">{{ cat.name }}</option>
+                                    {% empty %}
+                                        <option value="" disabled>No categories available</option>
+                                    {% endfor %}
+                                </select>
+                                <div class="invalid-feedback">Please select a category.</div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Department</label>
+                                <select name="department" class="form-select" id="departmentSelect">
+                                    <option value="">Select Department (optional)</option>
+                                    {% for dept in departments %}
+                                        <option value="{{ dept.id }}" data-dept='{"name":"{{ dept.name }}"}'>{{ dept.name }}</option>
+                                    {% empty %}
+                                        <option value="" disabled>No departments available</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Section: Priority -->
+                        <div class="form-section-title"><i class="fas fa-exclamation-triangle"></i>Priority Level</div>
+                        <div class="row g-3 mb-4">
+                            <div class="col-md-3 col-6">
+                                <div class="form-check priority-option">
+                                    <input class="form-check-input visually-hidden" type="radio" name="priority" id="prioLow" value="LOW">
+                                    <label class="priority-label" for="prioLow">
+                                        <i class="fas fa-chevron-circle-down text-info"></i>
+                                        <span>Low</span>
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="col-md-3 col-6">
+                                <div class="form-check priority-option">
+                                    <input class="form-check-input visually-hidden" type="radio" name="priority" id="prioMedium" value="MEDIUM" checked>
+                                    <label class="priority-label active" for="prioMedium">
+                                        <i class="fas fa-minus-circle text-warning"></i>
+                                        <span>Medium</span>
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="col-md-3 col-6">
+                                <div class="form-check priority-option">
+                                    <input class="form-check-input visually-hidden" type="radio" name="priority" id="prioHigh" value="HIGH">
+                                    <label class="priority-label" for="prioHigh">
+                                        <i class="fas fa-exclamation-circle text-danger"></i>
+                                        <span>High</span>
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="col-md-3 col-6">
+                                <div class="form-check priority-option">
+                                    <input class="form-check-input visually-hidden" type="radio" name="priority" id="prioEmergency" value="EMERGENCY">
+                                    <label class="priority-label" for="prioEmergency">
+                                        <i class="fas fa-bell text-danger"></i>
+                                        <span>Emergency</span>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Section: Description -->
+                        <div class="form-section-title"><i class="fas fa-align-left"></i>Description</div>
+                        <div class="mb-4">
+                            <textarea name="description" class="form-control" id="compDesc" rows="5" placeholder="Describe your issue in detail. Include when it started, location, and any relevant information..." required></textarea>
+                            <div class="invalid-feedback">Please provide a description.</div>
+                            <div class="form-text mt-1"><span id="charCount">0</span> characters</div>
+                        </div>
+
+                        <!-- Section: Media Uploads -->
+                        <div class="form-section-title"><i class="fas fa-images"></i>Media &amp; Attachments</div>
+                        <div class="row g-3 mb-4">
+                            <div class="col-md-4">
+                                <label class="form-label small fw-bold">Photo (JPG, PNG, WEBP)</label>
+                                <div class="upload-box" id="photoBox" onclick="document.getElementById('photoInput').click()">
+                                    <i class="fas fa-camera fa-2x text-muted mb-2"></i>
+                                    <div class="small text-muted">Click to upload photo</div>
+                                    <input type="file" name="photo" id="photoInput" accept="image/jpeg,image/png,image/webp">
+                                    <img class="preview d-none" id="photoPreview">
+                                    <div class="file-name"></div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small fw-bold">Document (PDF, DOC, DOCX)</label>
+                                <div class="upload-box" id="docBox" onclick="document.getElementById('docInput').click()">
+                                    <i class="fas fa-file-pdf fa-2x text-muted mb-2"></i>
+                                    <div class="small text-muted">Click to upload document</div>
+                                    <input type="file" name="document" id="docInput" accept=".pdf,.doc,.docx">
+                                    <div class="file-name"></div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small fw-bold">Additional Attachment</label>
+                                <div class="upload-box" id="attachBox" onclick="document.getElementById('attachInput').click()">
+                                    <i class="fas fa-paperclip fa-2x text-muted mb-2"></i>
+                                    <div class="small text-muted">Click to attach file</div>
+                                    <input type="file" name="attachment" id="attachInput" accept=".pdf,.jpg,.jpeg,.png,.gif,.doc,.docx">
+                                    <div class="file-name"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Section: QR Code & Location -->
+                        <div class="form-section-title"><i class="fas fa-map-marker-alt"></i>QR Scanner &amp; Location</div>
+                        <div class="row g-3 mb-4">
+                            <div class="col-md-6">
+                                <label class="form-label small fw-bold">QR Code Data</label>
+                                <div class="input-group">
+                                    <input type="text" name="qr_code_data" class="form-control" id="qrData" placeholder="Scan QR or enter manually" readonly>
+                                    <button type="button" class="btn btn-primary" onclick="openQRScanner()">
+                                        <i class="fas fa-qrcode"></i> Scan
+                                    </button>
+                                    <button type="button" class="btn btn-outline-secondary" onclick="clearQR()">
+                                        <i class="fas fa-times"></i>
+                                    </button>
+                                </div>
+                                <div class="form-text">Scan a QR code to auto-fill department/location info</div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small fw-bold">Your Location</label>
+                                <div class="d-flex gap-2">
+                                    <button type="button" class="btn btn-outline-primary w-100" onclick="getLocation()">
+                                        <i class="fas fa-crosshairs"></i> Get GPS Location
+                                    </button>
+                                </div>
+                                <input type="hidden" name="latitude" id="latInput">
+                                <input type="hidden" name="longitude" id="lngInput">
+                                <div id="locationDisplay" class="d-none location-preview">
+                                    <i class="fas fa-map-pin text-primary"></i>
+                                    <div><strong>Location captured</strong><br><span class="coord" id="coordDisplay"></span></div>
+                                </div>
+                                <div id="locationError" class="d-none small text-danger mt-1"></div>
+                            </div>
+                        </div>
+
+                        <!-- Section: Options -->
+                        <div class="form-section-title"><i class="fas fa-cog"></i>Options</div>
+                        <div class="mb-4">
+                            <div class="form-check">
+                                <input type="checkbox" name="is_anonymous" class="form-check-input" id="anonymousCheck">
+                                <label class="form-check-label" for="anonymousCheck">
+                                    <i class="fas fa-user-secret text-muted me-1"></i> Submit as Anonymous
+                                    <span class="small text-muted">(Your name will be hidden)</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Submit -->
+                        <hr class="my-4">
+                        <div class="d-flex gap-3 flex-wrap">
+                            <button type="submit" class="btn btn-primary btn-lg flex-fill" id="submitBtn">
+                                <i class="fas fa-paper-plane"></i> <span>Submit Complaint</span>
+                            </button>
+                            <a href="{% url 'complaints:list' %}" class="btn btn-outline-secondary btn-lg">
+                                <i class="fas fa-arrow-left"></i> Cancel
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- QR Scanner Modal -->
+<div class="scanner-modal" id="qrScannerModal">
+    <div class="scanner-box">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h5 class="fw-bold mb-0"><i class="fas fa-qrcode me-2"></i>Scan QR Code</h5>
+            <button type="button" class="btn-close" onclick="closeQRScanner()"></button>
+        </div>
+        <div id="qr-reader"></div>
+        <p class="small text-muted mt-2 mb-0">Point your camera at a QR code</p>
+    </div>
+</div>
+
+<!-- Priority radio styling -->
+<style>
+.priority-option { margin: 0; }
+.priority-label {
+    display: flex; flex-direction: column; align-items: center; gap: 4px;
+    padding: 1rem .75rem; border: 2px solid var(--gray-200); border-radius: var(--radius);
+    cursor: pointer; transition: all .2s ease; text-align: center;
+    font-weight: 600; font-size: .85rem; color: var(--gray-600);
+}
+.priority-label:hover { border-color: var(--primary); background: var(--gray-50); }
+.priority-label i { font-size: 1.5rem; }
+.priority-label.active, input:checked + .priority-label {
+    border-color: var(--primary); background: #eef2ff; color: var(--primary);
+}
+input:checked + .priority-label[for="prioEmergency"] {
+    border-color: var(--danger); background: #fee2e2; color: var(--danger);
+}
+input:checked + .priority-label[for="prioHigh"] {
+    border-color: var(--danger); background: #fee2e2; color: var(--danger);
+}
+input:checked + .priority-label[for="prioMedium"] {
+    border-color: var(--warning); background: #fef3c7; color: #92400e;
+}
+input:checked + .priority-label[for="prioLow"] {
+    border-color: var(--info); background: #e0f2fe; color: #075985;
+}
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script>
+let html5QrCode = null;
+let qrScannerActive = false;
+
+// Fallback: load via API only if server-side rendered options are empty
+document.addEventListener('DOMContentLoaded', async function() {
+    const catSel = document.getElementById('categorySelect');
+    if (catSel.options.length <= 1) {
+        try {
+            const cats = await apiGet('categories/');
+            catSel.innerHTML = '<option value="">Select Category</option>';
+            cats.forEach(c => {
+                catSel.innerHTML += `<option value="${c.id}">${c.name}</option>`;
+            });
+        } catch (e) {
+            catSel.innerHTML = '<option value="">Failed to load</option>';
+        }
+    }
+
+    const deptSel = document.getElementById('departmentSelect');
+    if (deptSel.options.length <= 1) {
+        try {
+            const depts = await apiGet('departments/');
+            deptSel.innerHTML = '<option value="">Select Department (optional)</option>';
+            depts.forEach(d => {
+                deptSel.innerHTML += `<option value="${d.id}" data-dept='${JSON.stringify(d)}'>${d.name}</option>`;
+            });
+        } catch (e) {}
+    }
+
+    // Char counter
+    document.getElementById('compDesc').addEventListener('input', function() {
+        document.getElementById('charCount').textContent = this.value.length;
+    });
+
+    // Photo preview
+    document.getElementById('photoInput').addEventListener('change', function(e) {
+        const box = document.getElementById('photoBox');
+        const preview = document.getElementById('photoPreview');
+        const nameEl = box.querySelector('.file-name');
+        if (this.files && this.files[0]) {
+            const reader = new FileReader();
+            reader.onload = function(ev) {
+                preview.src = ev.target.result;
+                preview.classList.remove('d-none');
+                box.classList.add('has-file');
+            };
+            reader.readAsDataURL(this.files[0]);
+            nameEl.textContent = this.files[0].name;
+            box.querySelector('.fa-camera').style.display = 'none';
+            box.querySelector('.small').style.display = 'none';
+        }
+    });
+
+    // Doc upload name
+    document.getElementById('docInput').addEventListener('change', function() {
+        const box = document.getElementById('docBox');
+        const nameEl = box.querySelector('.file-name');
+        if (this.files && this.files[0]) {
+            nameEl.textContent = this.files[0].name;
+            box.classList.add('has-file');
+        }
+    });
+
+    // Attachment name
+    document.getElementById('attachInput').addEventListener('change', function() {
+        const box = document.getElementById('attachBox');
+        const nameEl = box.querySelector('.file-name');
+        if (this.files && this.files[0]) {
+            nameEl.textContent = this.files[0].name;
+            box.classList.add('has-file');
+        }
+    });
+
+    // Form submission - traditional Django POST (also works with API tokens)
+    document.getElementById('complaintForm').addEventListener('submit', function(e) {
+        const form = this;
+        const btn = document.getElementById('submitBtn');
+        let valid = true;
+
+        form.querySelectorAll('.is-invalid').forEach(el => el.classList.remove('is-invalid'));
+        const title = document.getElementById('compTitle');
+        const cat = document.getElementById('categorySelect');
+        const desc = document.getElementById('compDesc');
+
+        if (!title.value.trim()) { title.classList.add('is-invalid'); valid = false; }
+        if (!cat.value) { cat.classList.add('is-invalid'); valid = false; }
+        if (!desc.value.trim()) { desc.classList.add('is-invalid'); valid = false; }
+
+        if (!valid) {
+            e.preventDefault();
+            return;
+        }
+
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Submitting...';
+    });
+});
+
+// QR Code Scanner
+function openQRScanner() {
+    const modal = document.getElementById('qrScannerModal');
+    modal.classList.add('active');
+    if (!html5QrCode) {
+        html5QrCode = new Html5Qrcode("qr-reader");
+    }
+    html5QrCode.start(
+        { facingMode: "environment" },
+        { fps: 10, qrbox: { width: 250, height: 250 } },
+        function(decodedText) {
+            document.getElementById('qrData').value = decodedText;
+            try {
+                const data = JSON.parse(decodedText);
+                if (data.department) {
+                    const deptSelect = document.getElementById('departmentSelect');
+                    for (let opt of deptSelect.options) {
+                        if (opt.text.toLowerCase() === data.department.toLowerCase()) {
+                            deptSelect.value = opt.value;
+                            break;
+                        }
+                    }
+                }
+            } catch(e) {}
+            closeQRScanner();
+        },
+        function(errorMessage) {}
+    ).catch(function(err) {
+        showAlert('Camera access denied or unavailable.', 'warning', 'alert-container');
+        modal.classList.remove('active');
+    });
+    qrScannerActive = true;
+}
+
+function closeQRScanner() {
+    const modal = document.getElementById('qrScannerModal');
+    modal.classList.remove('active');
+    if (html5QrCode && qrScannerActive) {
+        html5QrCode.stop().then(() => {}).catch(() => {});
+        qrScannerActive = false;
+    }
+}
+
+function clearQR() {
+    document.getElementById('qrData').value = '';
+}
+
+// GPS Location
+function getLocation() {
+    if (!navigator.geolocation) {
+        document.getElementById('locationError').textContent = 'Geolocation is not supported by your browser.';
+        document.getElementById('locationError').classList.remove('d-none');
+        return;
+    }
+    const btn = event.target;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Getting location...';
+
+    navigator.geolocation.getCurrentPosition(
+        function(pos) {
+            document.getElementById('latInput').value = pos.coords.latitude;
+            document.getElementById('lngInput').value = pos.coords.longitude;
+            document.getElementById('coordDisplay').textContent =
+                `${pos.coords.latitude.toFixed(6)}, ${pos.coords.longitude.toFixed(6)} (accuracy: ±${Math.round(pos.coords.accuracy)}m)`;
+            document.getElementById('locationDisplay').classList.remove('d-none');
+            document.getElementById('locationError').classList.add('d-none');
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-check"></i> Location Captured';
+        },
+        function(err) {
+            document.getElementById('locationError').textContent = 'Unable to get location: ' + err.message;
+            document.getElementById('locationError').classList.remove('d-none');
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-crosshairs"></i> Get GPS Location';
+        },
+        { enableHighAccuracy: true, timeout: 10000 }
+    );
+}
+
+// Close QR modal on backdrop click
+document.getElementById('qrScannerModal').addEventListener('click', function(e) {
+    if (e.target === this) closeQRScanner();
+});
+</script>
+{% endblock %}

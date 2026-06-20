@@ -1,0 +1,114 @@
+{% extends 'base.html' %}
+{% block title %}Edit Complaint - Fixora CMS{% endblock %}
+{% block content %}
+<div class="container">
+    <div class="page-header">
+        <h1><i class="fas fa-edit"></i> Edit Complaint</h1>
+        <p class="lead">Update your complaint details</p>
+    </div>
+
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                        <i class="fas {% if message.tags == 'success' %}fa-check-circle{% elif message.tags == 'error' %}fa-exclamation-circle{% else %}fa-info-circle{% endif %} me-2"></i>
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+
+            <div class="card">
+                <div class="card-body p-4 p-md-5">
+                    <div class="alert alert-info d-flex align-items-center gap-2">
+                        <i class="fas fa-info-circle"></i>
+                        Editing complaint: <strong>{{ complaint.complaint_id }}</strong>
+                    </div>
+
+                    <form method="post" enctype="multipart/form-data" novalidate>
+                        {% csrf_token %}
+                        <div class="mb-3">
+                            <label class="form-label">Title <span class="text-danger">*</span></label>
+                            <input type="text" name="title" class="form-control" value="{{ form.title.value|default:complaint.title }}" required>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Category <span class="text-danger">*</span></label>
+                                <select name="category" class="form-select">
+                                    {% for cat in form.category.field.queryset %}
+                                        <option value="{{ cat.id }}" {% if complaint.category_id == cat.id %}selected{% endif %}>{{ cat.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Priority <span class="text-danger">*</span></label>
+                                <select name="priority" class="form-select">
+                                    <option value="LOW" {% if complaint.priority == 'LOW' %}selected{% endif %}>Low</option>
+                                    <option value="MEDIUM" {% if complaint.priority == 'MEDIUM' %}selected{% endif %}>Medium</option>
+                                    <option value="HIGH" {% if complaint.priority == 'HIGH' %}selected{% endif %}>High</option>
+                                    <option value="EMERGENCY" {% if complaint.priority == 'EMERGENCY' %}selected{% endif %}>Emergency</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Description <span class="text-danger">*</span></label>
+                            <textarea name="description" class="form-control" rows="5" required>{{ form.description.value|default:complaint.description }}</textarea>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Photo</label>
+                                {% if complaint.photo %}
+                                    <div class="mb-2">
+                                        <a href="{{ complaint.photo.url }}" target="_blank" class="btn btn-sm btn-outline-info">
+                                            <i class="fas fa-image"></i> Current Photo
+                                        </a>
+                                    </div>
+                                {% endif %}
+                                <input type="file" name="photo" class="form-control" accept="image/jpeg,image/png,image/webp">
+                                <div class="form-text">Leave empty to keep current. Allowed: JPG, PNG, WEBP</div>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Document</label>
+                                {% if complaint.document %}
+                                    <div class="mb-2">
+                                        <a href="{{ complaint.document.url }}" target="_blank" class="btn btn-sm btn-outline-danger">
+                                            <i class="fas fa-file-pdf"></i> Current Document
+                                        </a>
+                                    </div>
+                                {% endif %}
+                                <input type="file" name="document" class="form-control" accept=".pdf,.doc,.docx">
+                                <div class="form-text">Leave empty to keep current. Allowed: PDF, DOC, DOCX</div>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Attachment</label>
+                            {% if complaint.attachment %}
+                                <div class="mb-2">
+                                    <a href="{{ complaint.attachment.url }}" target="_blank" class="btn btn-sm btn-outline-info">
+                                        <i class="fas fa-paperclip"></i> Current Attachment
+                                    </a>
+                                </div>
+                            {% endif %}
+                            <input type="file" name="attachment" class="form-control">
+                            <div class="form-text">Leave empty to keep current file. Allowed: PDF, JPG, PNG, DOC</div>
+                        </div>
+
+                        <div class="d-flex gap-3">
+                            <button type="submit" class="btn btn-primary btn-lg">
+                                <i class="fas fa-save"></i> Save Changes
+                            </button>
+                            <a href="{% url 'complaints:detail' pk=complaint.pk %}" class="btn btn-outline-secondary btn-lg">
+                                <i class="fas fa-times"></i> Cancel
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

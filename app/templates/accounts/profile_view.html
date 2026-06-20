@@ -1,0 +1,80 @@
+{% extends 'base.html' %}
+
+{% block title %}View Profile - Fixora CMS{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-6">
+            <div id="alert-container"></div>
+            <div class="card">
+                <div class="p-4 text-center" style="background: linear-gradient(135deg, var(--primary), var(--secondary)); border-radius: var(--radius) var(--radius) 0 0;">
+                    <img src="https://ui-avatars.com/api/?name=User&size=120&background=ffffff&color=4f46e5" alt="Profile" style="width: 120px; height: 120px; border-radius: 50%; object-fit: cover; border: 4px solid white; box-shadow: var(--shadow-md);" id="viewAvatar">
+                    <h4 class="fw-bold text-white mt-3 mb-0" id="viewName">Loading...</h4>
+                    <p class="text-white-50 mb-0 small" id="viewRole">-</p>
+                </div>
+                <div class="card-body p-4">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <div class="small text-muted fw-bold text-uppercase">Username</div>
+                            <div class="fw-bold" id="viewUsername">-</div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="small text-muted fw-bold text-uppercase">Email</div>
+                            <div class="fw-bold" id="viewEmail">-</div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="small text-muted fw-bold text-uppercase">First Name</div>
+                            <div class="fw-bold" id="viewFirstName">Not set</div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="small text-muted fw-bold text-uppercase">Last Name</div>
+                            <div class="fw-bold" id="viewLastName">Not set</div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="small text-muted fw-bold text-uppercase">Phone</div>
+                            <div class="fw-bold" id="viewPhone">Not set</div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="small text-muted fw-bold text-uppercase">Role</div>
+                            <div class="fw-bold" id="viewRoleLabel">-</div>
+                        </div>
+                    </div>
+                    <div class="text-end mt-4">
+                        <a href="/accounts/profile/" class="btn btn-primary">
+                            <i class="fas fa-edit me-2"></i> Edit Profile
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', async function() {
+        if (!isAuthenticated()) {
+            window.location.href = '/accounts/login/';
+            return;
+        }
+        try {
+            const data = await apiGet('profile/');
+            const user = data.user || {};
+            const name = (user.first_name || '') + ' ' + (user.last_name || '') || user.username || 'User';
+            document.getElementById('viewName').textContent = name;
+            document.getElementById('viewUsername').textContent = user.username || '-';
+            document.getElementById('viewEmail').textContent = user.email || '-';
+            document.getElementById('viewFirstName').textContent = user.first_name || 'Not set';
+            document.getElementById('viewLastName').textContent = user.last_name || 'Not set';
+            document.getElementById('viewPhone').textContent = data.phone || 'Not set';
+            document.getElementById('viewRole').textContent = data.role || 'USER';
+            document.getElementById('viewRoleLabel').textContent = data.role || 'USER';
+            document.getElementById('viewAvatar').src = 'https://ui-avatars.com/api/?name=' + encodeURIComponent(name) + '&size=120&background=ffffff&color=4f46e5';
+        } catch (error) {
+            showAlert('Failed to load profile.', 'danger');
+        }
+    });
+</script>
+{% endblock %}

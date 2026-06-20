@@ -1,0 +1,84 @@
+{% extends 'base.html' %}
+
+{% block title %}Submit Feedback - Fixora CMS{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-7">
+            <div id="alert-container"></div>
+
+            <div class="card">
+                <div class="card-header">
+                    <i class="fas fa-star me-2 text-warning"></i>Submit Feedback
+                    <small class="d-block text-muted mt-1" id="complaintInfo">Loading...</small>
+                </div>
+                <div class="card-body p-4">
+                    <p class="mb-3">How would you rate the resolution of this complaint?</p>
+                    <div class="mb-3">
+                        <select class="form-select" id="feedbackRating">
+                            <option value="5">5 - Excellent</option>
+                            <option value="4">4 - Very Good</option>
+                            <option value="3">3 - Good</option>
+                            <option value="2">2 - Fair</option>
+                            <option value="1">1 - Poor</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Comment (Optional)</label>
+                        <textarea class="form-control" id="feedbackComment" rows="3" placeholder="Share your experience..."></textarea>
+                    </div>
+                    <div class="d-flex justify-content-between mt-4">
+                        <a href="#" id="backLink" class="btn btn-outline-secondary">
+                            <i class="fas fa-arrow-left"></i> Back
+                        </a>
+                        <button class="btn btn-warning px-5" id="submitFeedbackBtn" onclick="submitFeedback()">
+                            <i class="fas fa-paper-plane"></i> Submit Feedback
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    const feedbackComplaintId = window.location.pathname.split('/').filter(Boolean).slice(-2)[0];
+
+    document.addEventListener('DOMContentLoaded', async function() {
+        if (!isAuthenticated()) {
+            window.location.href = '/accounts/login/';
+            return;
+        }
+        document.getElementById('backLink').href = '/complaints/' + feedbackComplaintId + '/';
+        try {
+            const data = await apiGet('complaints/' + feedbackComplaintId + '/');
+            document.getElementById('complaintInfo').textContent = data.complaint_id + ' - ' + data.title;
+        } catch (e) {
+            document.getElementById('complaintInfo').textContent = 'Complaint #' + feedbackComplaintId;
+        }
+    });
+
+    async function submitFeedback() {
+        const rating = document.getElementById('feedbackRating').value;
+        const comment = document.getElementById('feedbackComment').value;
+        const btn = document.getElementById('submitFeedbackBtn');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Submitting...';
+
+        try {
+            await apiPost('complaints/' + feedbackComplaintId + '/feedback/', { rating: parseInt(rating), comment: comment });
+            showAlert('Thank you for your feedback!', 'success');
+            setTimeout(() => {
+                window.location.href = '/complaints/' + feedbackComplaintId + '/';
+            }, 1000);
+        } catch (error) {
+            showAlert('Failed to submit feedback: ' + error.message, 'danger');
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-paper-plane"></i> Submit Feedback';
+        }
+    }
+</script>
+{% endblock %}

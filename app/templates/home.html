@@ -1,0 +1,242 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block title %}Fixora CMS - Complaint Management System{% endblock %}
+{% block content %}
+
+<style>
+.how-it-works-step {
+    text-align: center;
+    padding: 2rem 1.5rem;
+    position: relative;
+}
+.how-it-works-step .step-number {
+    width: 48px;
+    height: 48px;
+    background: linear-gradient(135deg, var(--primary), var(--secondary));
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 800;
+    font-size: 1.25rem;
+    margin: 0 auto 1.25rem;
+}
+.how-it-works-step .step-icon {
+    font-size: 2rem;
+    color: var(--primary);
+    margin-bottom: 1rem;
+}
+.step-connector {
+    display: none;
+}
+@media (min-width: 768px) {
+    .step-connector {
+        display: block;
+        position: absolute;
+        top: 3.5rem;
+        right: -1.5rem;
+        width: 3rem;
+        height: 2px;
+        background: var(--gray-200);
+    }
+    .step-connector i {
+        position: absolute;
+        right: -6px;
+        top: -6px;
+        color: var(--gray-300);
+        font-size: 14px;
+    }
+}
+.contact-card {
+    border: none;
+    border-radius: var(--radius);
+    padding: 2rem;
+    background: white;
+    box-shadow: var(--shadow);
+    transition: all .25s ease;
+    text-align: center;
+    height: 100%;
+}
+.contact-card:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-lg);
+}
+.contact-card .contact-icon {
+    width: 56px;
+    height: 56px;
+    border-radius: var(--radius-sm);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    margin: 0 auto 1rem;
+}
+.section-title {
+    font-weight: 800;
+    font-size: 2rem;
+    color: var(--gray-900);
+    letter-spacing: -.5px;
+    margin-bottom: .5rem;
+}
+.section-subtitle {
+    color: var(--gray-500);
+    font-size: 1.05rem;
+    margin-bottom: 3rem;
+}
+</style>
+
+<div class="container">
+    <div class="hero-section">
+        <div class="row align-items-center g-5">
+            <div class="col-lg-6">
+                <h1>
+                    Welcome to <span class="highlight">Fixora CMS</span>
+                </h1>
+                <p class="lead mt-3 mb-4">
+                    A modern complaint management platform for submitting, tracking, and resolving issues efficiently and transparently.
+                </p>
+                <div class="d-flex gap-3 flex-wrap">
+                    {% if user.is_authenticated %}
+                        <a href="{% url 'dashboard:dashboard' %}" class="btn btn-primary btn-lg">
+                            <i class="fas fa-tachometer-alt"></i> Go to Dashboard
+                        </a>
+                        <a href="{% url 'complaints:submit' %}" class="btn btn-success btn-lg">
+                            <i class="fas fa-plus"></i> Submit Complaint
+                        </a>
+                    {% else %}
+                        <a href="{% url 'accounts:login' %}" class="btn btn-primary btn-lg">
+                            <i class="fas fa-sign-in-alt"></i> Login
+                        </a>
+                        <a href="{% url 'accounts:register' %}" class="btn btn-success btn-lg">
+                            <i class="fas fa-user-plus"></i> Register
+                        </a>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="col-lg-6">
+                <img src="https://img.freepik.com/free-vector/complaint-concept-illustration_114360-12128.jpg?w=600" alt="Complaint Management" class="img-fluid rounded-4 shadow-lg">
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4 mt-3">
+        <div class="col-md-4">
+            <div class="feature-card">
+                <div class="feature-icon" style="background: #eef2ff; color: var(--primary);">
+                    <i class="fas fa-file-alt"></i>
+                </div>
+                <h5 class="fw-bold">Easy Submission</h5>
+                <p class="text-muted mb-0">Submit complaints with attachments, choose categories and priority levels for faster resolution.</p>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="feature-card">
+                <div class="feature-icon" style="background: #d1fae5; color: var(--success);">
+                    <i class="fas fa-search"></i>
+                </div>
+                <h5 class="fw-bold">Real-time Tracking</h5>
+                <p class="text-muted mb-0">Monitor your complaint status with instant updates, notifications, and detailed history.</p>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="feature-card">
+                <div class="feature-icon" style="background: #fef3c7; color: var(--warning);">
+                    <i class="fas fa-file-pdf"></i>
+                </div>
+                <h5 class="fw-bold">PDF Reports</h5>
+                <p class="text-muted mb-0">Download detailed complaint reports in PDF format for your records anytime.</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<section class="mt-5 pt-5" style="background: white;">
+    <div class="container">
+        <div class="text-center">
+            <h2 class="section-title">How It Works</h2>
+            <p class="section-subtitle">Get your complaints resolved in four simple steps</p>
+        </div>
+
+        <div class="row mt-4">
+            <div class="col-md-3">
+                <div class="how-it-works-step">
+                    <div class="step-number">1</div>
+                    <div class="step-icon"><i class="fas fa-user-plus"></i></div>
+                    <h5 class="fw-bold">Create Account</h5>
+                    <p class="text-muted small mb-0">Register with your details and set up your profile to get started.</p>
+                    <div class="step-connector"><i class="fas fa-chevron-right"></i></div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="how-it-works-step">
+                    <div class="step-number">2</div>
+                    <div class="step-icon"><i class="fas fa-file-alt"></i></div>
+                    <h5 class="fw-bold">Submit Complaint</h5>
+                    <p class="text-muted small mb-0">Fill in the details, attach supporting documents, and submit.</p>
+                    <div class="step-connector"><i class="fas fa-chevron-right"></i></div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="how-it-works-step">
+                    <div class="step-number">3</div>
+                    <div class="step-icon"><i class="fas fa-sync-alt"></i></div>
+                    <h5 class="fw-bold">Track Progress</h5>
+                    <p class="text-muted small mb-0">Monitor your complaint status and receive real-time notifications.</p>
+                    <div class="step-connector"><i class="fas fa-chevron-right"></i></div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="how-it-works-step">
+                    <div class="step-number">4</div>
+                    <div class="step-icon"><i class="fas fa-check-circle"></i></div>
+                    <h5 class="fw-bold">Get Resolution</h5>
+                    <p class="text-muted small mb-0">Receive admin response and provide feedback on the resolution.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="mt-5 pt-5 pb-5">
+    <div class="container">
+        <div class="text-center">
+            <h2 class="section-title">Get In Touch</h2>
+            <p class="section-subtitle">Have questions or need assistance? We're here to help</p>
+        </div>
+
+        <div class="row g-4 mt-3">
+            <div class="col-md-4">
+                <div class="contact-card">
+                    <div class="contact-icon" style="background: #eef2ff; color: var(--primary);">
+                        <i class="fas fa-envelope"></i>
+                    </div>
+                    <h5 class="fw-bold">Email Us</h5>
+                    <p class="text-muted small mb-2">Send us an email anytime</p>
+                    <a href="mailto:support@fixora.local" class="fw-bold text-decoration-none" style="color: var(--primary);">support@fixora.local</a>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="contact-card">
+                    <div class="contact-icon" style="background: #d1fae5; color: var(--success);">
+                        <i class="fas fa-phone-alt"></i>
+                    </div>
+                    <h5 class="fw-bold">Call Us</h5>
+                    <p class="text-muted small mb-2">Mon-Fri, 9:00 AM - 6:00 PM</p>
+                    <a href="tel:+1234567890" class="fw-bold text-decoration-none" style="color: var(--success);">+1 (234) 567-890</a>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="contact-card">
+                    <div class="contact-icon" style="background: #fef3c7; color: var(--warning);">
+                        <i class="fas fa-map-marker-alt"></i>
+                    </div>
+                    <h5 class="fw-bold">Visit Us</h5>
+                    <p class="text-muted small mb-2">Main Office</p>
+                    <span class="fw-bold" style="color: var(--gray-700);">123 Business Ave, Suite 100<br>New York, NY 10001</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}

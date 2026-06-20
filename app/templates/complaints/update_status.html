@@ -1,0 +1,130 @@
+{% extends 'base.html' %}
+
+{% block title %}Update Status - Fixora CMS{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-7">
+            <div id="alert-container"></div>
+
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span><i class="fas fa-edit me-2 text-primary"></i>Update Complaint Status</span>
+                    <span class="badge bg-primary" id="headerComplaintId">Loading...</span>
+                </div>
+                <div class="card-body p-4">
+                    <div class="mb-4 p-3 rounded-3" style="background: var(--gray-50);">
+                        <div class="fw-bold" id="complaintTitle">Loading...</div>
+                        <small class="text-muted">Submitted by <span id="complaintUser">-</span> on <span id="complaintDate">-</span></small>
+                        <div class="mt-2" id="currentStatusBadge"></div>
+                    </div>
+
+                    <form id="updateStatusForm" method="post" action="">
+                        {% csrf_token %}
+                        <div class="mb-3">
+                            <label class="form-label">New Status</label>
+                            <select name="status" class="form-select" id="statusSelect" required>
+                                <option value="PENDING">Pending</option>
+                                <option value="IN_PROGRESS">In Progress</option>
+                                <option value="RESOLVED">Resolved</option>
+                                <option value="REJECTED">Rejected</option>
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Admin Remarks</label>
+                            <textarea name="admin_remarks" class="form-control" rows="4" placeholder="Add remarks about this status change (visible to user)"></textarea>
+                            <div class="form-text">These remarks will be visible to the user.</div>
+                        </div>
+
+                        <div class="d-flex gap-2 justify-content-end mt-4">
+                            <a href="{% url 'complaints:list' %}" class="btn btn-outline-secondary">Cancel</a>
+                            <button type="submit" class="btn btn-primary px-4" id="updateBtn">
+                                <i class="fas fa-save"></i> Update Status
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div class="card mt-4">
+                <div class="card-header">
+                    <i class="fas fa-history me-2 text-info"></i>Recent History
+                </div>
+                <div class="list-group list-group-flush" id="historyList">
+                    <div class="text-center py-4 text-muted small">Loading...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    const complaintId = window.location.pathname.split('/').filter(Boolean).slice(-2)[0];
+
+    document.addEventListener('DOMContentLoaded', async function() {
+        if (!isAuthenticated()) {
+            window.location.href = '/accounts/login/';
+            return;
+        }
+        await loadComplaint();
+    });
+
+    async function loadComplaint() {
+        try {
+            const data = await apiGet('complaints/' + complaintId + '/');
+            document.getElementById('headerComplaintId').textContent = data.complaint_id;
+            document.getElementById('complaintTitle').textContent = data.title;
+            document.getElementById('complaintUser').textContent = data.user_name || 'N/A';
+            document.getElementById('complaintDate').textContent = formatDate(data.created_at);
+            document.getElementById('currentStatusBadge').innerHTML = 'Current: ' + getStatusBadge(data.status);
+            document.getElementById('statusSelect').value = data.status;
+
+            const logDiv = document.getElementById('historyList');
+            if (data.history && data.history.length > 0) {
+                logDiv.innerHTML = data.history.slice(0, 5).map(h => `
+                    <div class="list-group-item">
+                        <div class="d-flex justify-content-between">
+                            <span class="fw-bold small">${h.action}</span>
+                            <small class="text-muted">${formatDateTime(h.timestamp)}</small>
+                        </div>
+                        <small class="text-muted">By: ${h.changed_by_name || 'System'}</small>
+                    </div>
+                `).join('');
+            } else {
+                logDiv.innerHTML = '<div class="text-center py-4 text-muted small">No history available</div>';
+            }
+        } catch (error) {
+            showAlert('Failed to load complaint details.', 'danger');
+        }
+    }
+
+    document.getElementById('updateStatusForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        const formData = new FormData(this);
+        const data = {
+            status: formData.get('status'),
+            admin_remarks: formData.get('admin_remarks') || '',
+        };
+
+        const btn = document.getElementById('updateBtn');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Updating...';
+
+        try {
+            await apiPatch('complaints/' + complaintId + '/status/', data);
+            showAlert('Status updated successfully!', 'success');
+            setTimeout(() => {
+                window.location.href = '/complaints/' + complaintId + '/';
+            }, 1000);
+        } catch (error) {
+            showAlert('Failed to update status: ' + error.message, 'danger');
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-save"></i> Update Status';
+        }
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,70 @@
+{% extends 'base.html' %}
+{% block title %}Notifications - Fixora CMS{% endblock %}
+{% block content %}
+<div class="container-fluid px-4">
+    <div class="page-header d-flex justify-content-between align-items-center flex-wrap gap-3">
+        <div>
+            <h1><i class="fas fa-bell"></i> Notifications</h1>
+        </div>
+        <form method="post" action="{% url 'dashboard:mark_all_read' %}" style="display:inline;">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-outline-primary btn-sm">
+                <i class="fas fa-check-double"></i> Mark All Read
+            </button>
+        </form>
+    </div>
+
+    <!-- API-loaded notifications -->
+    <div class="card">
+        <div class="card-body p-0" id="notificationsContainer">
+            <div class="text-center py-5">
+                <i class="fas fa-spinner fa-spin fa-2x text-muted mb-2 d-block"></i>
+                <p class="text-muted">Loading notifications...</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', async function() {
+    try {
+        const notifs = await apiGet('notifications/');
+        const container = document.getElementById('notificationsContainer');
+
+        if (notifs && notifs.length > 0) {
+            container.innerHTML = '<div class="list-group list-group-flush">' +
+                notifs.map(function(n) {
+                    const iconClass = n.notification_type === 'STATUS_CHANGE' ? 'fa-sync-alt' :
+                                     n.notification_type === 'RESOLUTION' ? 'fa-check-circle' :
+                                     n.notification_type === 'REJECTION' ? 'fa-times-circle' : 'fa-file-alt';
+                    const iconBg = n.notification_type === 'STATUS_CHANGE' ? '#e0f2fe' :
+                                   n.notification_type === 'RESOLUTION' ? '#d1fae5' :
+                                   n.notification_type === 'REJECTION' ? '#fee2e2' : '#fef3c7';
+                    const iconColor = n.notification_type === 'STATUS_CHANGE' ? 'var(--info)' :
+                                      n.notification_type === 'RESOLUTION' ? 'var(--success)' :
+                                      n.notification_type === 'REJECTION' ? 'var(--danger)' : 'var(--warning)';
+                    const link = n.complaint ? '/complaints/' + n.complaint + '/' : '#';
+                    return '<a href="' + link + '" class="list-group-item list-group-item-action notif-item' + (n.is_read ? '' : ' fw-bold') + '">' +
+                        '<div class="notif-icon" style="background:' + iconBg + ';color:' + iconColor + ';">' +
+                            '<i class="fas ' + iconClass + '"></i>' +
+                        '</div>' +
+                        '<div class="notif-content">' +
+                            '<div class="notif-title">' + n.title + '</div>' +
+                            '<div class="notif-msg">' + n.message + '</div>' +
+                        '</div>' +
+                        '<div class="notif-time">' + formatDateTime(n.created_at) + '</div>' +
+                        (n.is_read ? '' : '<span class="badge bg-primary rounded-pill ms-2" style="font-size:.5rem;">New</span>') +
+                    '</a>';
+                }).join('') +
+                '</div>';
+        } else {
+            container.innerHTML = '<div class="text-center py-5"><i class="fas fa-bell-slash fa-3x text-light mb-3 d-block"></i><h5 class="text-muted">No notifications</h5><p class="small text-muted">You\'re all caught up!</p></div>';
+        }
+    } catch(e) {
+        document.getElementById('notificationsContainer').innerHTML = '<div class="text-center py-5 text-danger"><i class="fas fa-exclamation-triangle fa-2x mb-2 d-block"></i><p>Failed to load notifications.</p></div>';
+    }
+});
+</script>
+{% endblock %}

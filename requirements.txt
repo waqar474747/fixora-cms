@@ -1,0 +1,10 @@
+Django==5.2.10
+Pillow==12.1.0
+weasyprint==68.0
+reportlab==4.4.9
+django-crispy-forms==2.5
+crispy-bootstrap5==2025.6
+python-decouple==3.8
+asgiref==3.11.0
+sqlparse==0.5.5
+djangorestframework==3.16.0
