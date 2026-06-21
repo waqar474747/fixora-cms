@@ -1,4 +1,5 @@
 from django.shortcuts import render, redirect, get_object_or_404
+from django.contrib.auth.models import User
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.views.decorators.http import require_http_methods
@@ -46,7 +47,7 @@ def submit_complaint(request):
                     pass
             complaint.save()
             
-            # Create notification
+            # Create notification for user
             Notification.objects.create(
                 user=request.user,
                 complaint=complaint,
@@ -54,6 +55,18 @@ def submit_complaint(request):
                 title='Complaint Submitted',
                 message=f'Your complaint "{complaint.title}" has been submitted successfully.'
             )
+
+            # Notify all admins
+            admin_users = User.objects.filter(profile__role='ADMIN')
+            submitter_name = request.user.get_full_name() or request.user.username
+            for admin in admin_users:
+                Notification.objects.create(
+                    user=admin,
+                    complaint=complaint,
+                    notification_type='NEW_COMPLAINT',
+                    title='New Complaint Received',
+                    message=f'New complaint "{complaint.title}" (ID: {complaint.complaint_id}) has been submitted by {submitter_name}.'
+                )
             
             # Log activity
             log_activity(request.user, 'COMPLAINT_SUBMIT', f'Submitted complaint {complaint.complaint_id}', request)
@@ -370,13 +383,12 @@ def edit_complaint(request, pk):
 @csrf_protect
 def delete_complaint(request, pk):
     complaint = get_object_or_404(Complaint, pk=pk)
+    user_profile = request.user.profile
 
-    if complaint.user != request.user:
-        return HttpResponseForbidden("You do not have permission to delete this complaint.")
-
-    if complaint.status not in ['SUBMITTED', 'PENDING']:
-        messages.error(request, 'You can only delete complaints that are submitted or pending.')
-        return redirect('complaints:detail', pk=pk)
+    # Allow admins to delete any complaint; owners can delete their own
+    if not (user_profile.is_admin() or request.user.is_superuser):
+        if complaint.user != request.user:
+            return HttpResponseForbidden("You do not have permission to delete this complaint.")
 
     complaint_id = complaint.complaint_id
     complaint.delete()

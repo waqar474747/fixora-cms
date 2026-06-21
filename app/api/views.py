@@ -144,6 +144,19 @@ class ComplaintListCreateView(generics.ListCreateAPIView):
             title='Complaint Submitted',
             message=f'Your complaint "{complaint.title}" has been submitted successfully.'
         )
+
+        # Notify all admins
+        admin_users = User.objects.filter(profile__role='ADMIN')
+        submitter_name = self.request.user.get_full_name() or self.request.user.username
+        for admin in admin_users:
+            Notification.objects.create(
+                user=admin,
+                complaint=complaint,
+                notification_type='NEW_COMPLAINT',
+                title='New Complaint Received',
+                message=f'New complaint "{complaint.title}" (ID: {complaint.complaint_id}) has been submitted by {submitter_name}.'
+            )
+
         ActivityLog.objects.create(
             user=self.request.user, action_type='COMPLAINT_SUBMIT',
             description=f'Submitted complaint {complaint.complaint_id}'

@@ -275,11 +275,14 @@
             {% endif %}
 
             <!-- Edit/Delete Actions -->
-            {% if complaint.user == request.user and complaint.status in 'SUBMITTED,PENDING' %}
+            {% with profile=user|get_profile %}
+            {% if complaint.user == request.user %}
             <div class="d-flex gap-2 mb-4">
+                {% if complaint.status in 'SUBMITTED,PENDING' %}
                 <a href="{% url 'complaints:edit' pk=complaint.pk %}" class="btn btn-warning">
                     <i class="fas fa-edit"></i> Edit Complaint
                 </a>
+                {% endif %}
                 <form method="post" action="{% url 'complaints:delete' pk=complaint.pk %}" onsubmit="return confirm('Are you sure? This cannot be undone.');">
                     {% csrf_token %}
                     <button type="submit" class="btn btn-danger">
@@ -287,7 +290,17 @@
                     </button>
                 </form>
             </div>
+            {% elif profile.is_admin or user.is_superuser %}
+            <div class="d-flex gap-2 mb-4">
+                <form method="post" action="{% url 'complaints:delete' pk=complaint.pk %}" onsubmit="return confirm('Delete this complaint? This cannot be undone.');">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-danger">
+                        <i class="fas fa-trash"></i> Delete Complaint
+                    </button>
+                </form>
+            </div>
             {% endif %}
+            {% endwith %}
         </div>
 
         <!-- Sidebar -->
